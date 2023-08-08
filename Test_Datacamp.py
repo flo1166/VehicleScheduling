@@ -62,20 +62,20 @@ def train(n_training_episodes, min_epsilon, max_epsilon, decay_rate, env, max_st
         steps = 0
         done = False
 
-    # repeat
-    for steps in range(max_steps):
-      action = epsilon_greedy_policy(Qtable, state, epsilon)
-      
-      new_state, reward, done, truncated, info = env.step(action)
-      
-      Qtable[state][action] = Qtable[state][action] + learning_rate * (reward + gamma * np.max(Qtable[new_state]) - Qtable[state][action])
+        # repeat
+        for steps in range(max_steps):
+          action = epsilon_greedy_policy(Qtable, state, epsilon)
+          
+          new_state, reward, done, truncated, info = env.step(action)
+          
+          Qtable[state][action] = Qtable[state][action] + learning_rate * (reward + gamma * np.max(Qtable[new_state]) - Qtable[state][action])
 
-      # If done, finish the episode
-      if done:
-        break
-     
-      # Our state is the new state
-      state = new_state
+          # If done, finish the episode
+          if done:
+            break
+        
+          # Our state is the new state
+          state = new_state
       
     return Qtable
 
