@@ -4,8 +4,8 @@ import pygame
 import numpy as np
 
 
-class GridWorldEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
+class VehicleScheduling(gym.Env):
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 100000}
 
     def __init__(self, render_mode=None, size=10):
         self.size = size  # The size of the square grid
@@ -49,12 +49,13 @@ class GridWorldEnv(gym.Env):
         self.step_counter = 0
         self.previous_time = 0
         self.episode = 0
+        self.reward = 0
     
     def _get_obs(self):
-        return {"agent": self._agent_location, "target": self._target_location}
+        return ({"agent": self._agent_location, "target": self._target_location})
     
     def _get_info(self):
-        return {"distance": np.linalg.norm(self._agent_location - self._target_location, ord=1)}
+        return ({"distance": np.linalg.norm(self._agent_location - self._target_location, ord=1)})
     
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
@@ -79,6 +80,7 @@ class GridWorldEnv(gym.Env):
         self.previous_time = self.step_counter
         self.step_counter = 0
         self.episode += 1
+        self.reward = 0
         return observation, info
     
     def step(self, action):
@@ -90,15 +92,18 @@ class GridWorldEnv(gym.Env):
             self._agent_location + direction, 0, self.size - 1
         )
         # An episode is done if the agent has reached the target
-        terminated = np.array_equal(self._agent_location, self._target_location)
-        reward = 1 if terminated else 0  # Binary sparse rewards
+        done = np.array_equal(self._agent_location, self._target_location)
+        reward = 100 - self.step_counter + self.size if done else 0  # Binary sparse rewards
         observation = self._get_obs()
         info = self._get_info()
+
+        # save reward
+        self.reward += reward
 
         if self.render_mode == "human":
             self._render_frame()
 
-        return observation, reward, terminated, False, info
+        return observation, reward, done, False, info
     
     def render(self):
         if self.render_mode == "rgb_array":
@@ -162,9 +167,13 @@ class GridWorldEnv(gym.Env):
         text = font.render("Step: " + str(self.step_counter), False, (0, 0, 0))
         text2 = font.render("Previous Steps: " + str(self.previous_time), False, (0, 0, 0))
         text3 = font.render("Episode: " + str(self.episode), False, (0, 0, 0))
+        text4 = font.render("Reward: " + str(self.reward), False, (0, 0, 0))
+        text5 = font.render("Action: "  , False, (0, 0, 0))
         canvas.blit(text, (300,300))
         canvas.blit(text2, (300,325))
         canvas.blit(text3, (300,350))
+        canvas.blit(text4, (300,375))
+        canvas.blit(text5, (300,400))
 
         if self.render_mode == "human":
             # The following line copies our drawings from `canvas` to the visible window
