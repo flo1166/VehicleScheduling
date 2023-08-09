@@ -5,9 +5,10 @@ import numpy as np
 
 
 class VehicleScheduling(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 100000}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 10000}
 
     def __init__(self, render_mode=None, size=10):
+        
         self.size = size  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
 
@@ -15,8 +16,8 @@ class VehicleScheduling(gym.Env):
         # Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
         self.observation_space = spaces.Dict(
             {
-                "agent": spaces.Box(0, size - 1, shape=(1, size), dtype=int),
-                "target": spaces.Box(0, size - 1, shape=(1, size), dtype=int),
+                "agent": spaces.Box(0, size - 1, shape=(2, ), dtype=int),
+                "target": spaces.Box(0, size - 1, shape=(2, ), dtype=int),
             }
         )
 
@@ -46,30 +47,29 @@ class VehicleScheduling(gym.Env):
         """
         self.window = None
         self.clock = None
+
+        # Counter
         self.step_counter = 0
         self.previous_time = 0
         self.episode = 0
         self.reward = 0
+        self.action = ''
     
     def _get_obs(self):
-        return ({"agent": self._agent_location, "target": self._target_location})
+        return {"agent": self._agent_location, "target": self._target_location}
     
     def _get_info(self):
-        return ({"distance": np.linalg.norm(self._agent_location - self._target_location, ord=1)})
+        return {"distance": np.linalg.norm(self._agent_location - self._target_location, ord=1)}
     
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
         # Choose the agent's location uniformly at random
-        self._agent_location = np.array([0,0])
+        self._agent_location = np.array([0,0], dtype=int)
 
         # We will sample the target's location randomly until it does not coincide with the agent's location
-        self._target_location = np.array([9,0])
-        #while np.array_equal(self._target_location, self._agent_location):
-        #    self._target_location = self.np_random.integers(
-        #        0, self.size, size=2, dtype=int
-        #    )
+        self._target_location = np.array([9,0], dtype=int)
 
         observation = self._get_obs()
         info = self._get_info()
@@ -97,8 +97,9 @@ class VehicleScheduling(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
 
-        # save reward
+        # save reward for displaying
         self.reward += reward
+        self.action = action
 
         if self.render_mode == "human":
             self._render_frame()
@@ -168,7 +169,15 @@ class VehicleScheduling(gym.Env):
         text2 = font.render("Previous Steps: " + str(self.previous_time), False, (0, 0, 0))
         text3 = font.render("Episode: " + str(self.episode), False, (0, 0, 0))
         text4 = font.render("Reward: " + str(self.reward), False, (0, 0, 0))
-        text5 = font.render("Action: "  , False, (0, 0, 0))
+
+        if self.action == 0:
+            action = 'right'
+        elif self.action == 1:
+            action = 'stop'
+        else:
+            action = 'left'
+        text5 = font.render("Action: " + action, False, (0, 0, 0))
+
         canvas.blit(text, (300,300))
         canvas.blit(text2, (300,325))
         canvas.blit(text3, (300,350))

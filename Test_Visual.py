@@ -17,7 +17,7 @@ def print_env(env):
     print("Action Space Shape", env.action_space.n)
     print("Action Space Sample", env.action_space.sample())
 
-    state_space = len(env.observation_space['agent'].sample()[0])
+    state_space = env.size
     print("There are ", state_space, " possible states")
 
     action_space = env.action_space.n
@@ -45,8 +45,8 @@ def greedy_policy(Qtable, state):
   return action
 
 # Training parameters
-n_training_episodes = 1000
-learning_rate = 0.7        
+n_training_episodes = 500
+learning_rate = 0.5        
 
 # Evaluation parameters
 n_eval_episodes = 1000      
@@ -54,7 +54,7 @@ n_eval_episodes = 1000
 # Environment parameters
 env_id = "VehicleScheduling-v1"   
 max_steps = 99             
-gamma = 1              
+gamma = 0.90              
 eval_seed = []             
 
 # Exploration parameters
@@ -63,29 +63,35 @@ min_epsilon = 0.05
 decay_rate = 0.0005   
 
 def train(n_training_episodes, min_epsilon, max_epsilon, decay_rate, env, max_steps, Qtable):
-    for episode in range(n_training_episodes):
-        epsilon = min_epsilon + (max_epsilon - min_epsilon)*np.exp(-decay_rate*episode)
-        # Reset the environment
-        state = env.reset()[0]
-        steps = 0
-        done = False
+  for episode in range(n_training_episodes):
+    epsilon = min_epsilon + (max_epsilon - min_epsilon)*np.exp(-decay_rate*episode)
+    # Reset the environment
+    state = env.reset()[0]
+    steps = 0
+    done = False
 
-        # repeat
-        for steps in range(max_steps):
-          action = epsilon_greedy_policy(Qtable, state, epsilon)
+    # repeat
+    for steps in range(max_steps):
+      action = epsilon_greedy_policy(Qtable, state, epsilon)
+      #if steps == 0 and action == 2:
+      #  while action == 2:
+      #    action = epsilon_greedy_policy(Qtable, state, epsilon)
           
-          new_state, reward, done, truncated, info = env.step(action)
-          
-          Qtable[state['agent'][0]][action] = Qtable[state['agent'][0]][action] + learning_rate * (reward + gamma * np.max(Qtable[new_state['agent'][0]]) - Qtable[new_state['agent'][0]][action])
-
-          # If done, finish the episode
-          if done:
-            break
-        
-          # Our state is the new state
-          state = new_state
+      new_state, reward, done, truncated, info = env.step(action)
       
-    return Qtable
+      Qtable[state['agent'][0]][action] = Qtable[state['agent'][0]][action] + learning_rate * (reward + gamma * np.max(Qtable[new_state['agent'][0]]) - Qtable[new_state['agent'][0]][action])
+
+      # If done, finish the episode
+      if done:
+        break
+    
+      # Our state is the new state
+      state = new_state
+    
+    # Print every 20th qvalue table
+    if episode % 20 == 0:
+      print('Step ' + str(episode) + ':\n', Qtable)
+  return Qtable
 
 Qtable_VehicleScheduling = train(n_training_episodes, min_epsilon, max_epsilon, decay_rate, env, max_steps, Qtable_VehicleScheduling)
 
@@ -119,8 +125,8 @@ def evaluate_agent(env, max_steps, n_eval_episodes, Q, seed):
   return mean_reward, std_reward
 
 # Evaluate our Agent
-mean_reward, std_reward = evaluate_agent(env, max_steps, n_eval_episodes, Qtable_VehicleScheduling, eval_seed)
-print(f"Mean_reward={mean_reward:.2f} +/- {std_reward:.2f}")
+#mean_reward, std_reward = evaluate_agent(env, max_steps, n_eval_episodes, Qtable_VehicleScheduling, eval_seed)
+#print(f"Mean_reward={mean_reward:.2f} +/- {std_reward:.2f}")
 
 env.render()
 env.close()
