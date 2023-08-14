@@ -51,8 +51,7 @@ class VehicleScheduling(gym.Env):
         self.step_counter = 0
         self.previous_time = 0
         self.episode = 0
-        self.total_reward = 0
-        self.prev_total_reward = 0
+        self.total_reward = [0,0]
  
     def _create_grid(self):
         for i in self.stations:
@@ -130,6 +129,11 @@ class VehicleScheduling(gym.Env):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
+        # update reward
+        reward = [j.reward for j in self.agents]
+        reward = np.sum(reward)
+        self.total_reward.append(reward)
+
         # Choose the agent's location uniformly at random
         for i in self.agents:
             i.current_state = i.start_location
@@ -137,7 +141,6 @@ class VehicleScheduling(gym.Env):
             i.reward = 0
             i.prev_lateness = i.lateness
             i.lateness = 0
-            print(i.qtable)
 
         observation = self._get_obs()
         info = self._get_info()
@@ -145,11 +148,11 @@ class VehicleScheduling(gym.Env):
         if self.render_mode == "human":
             self._render_frame()
 
+        # reset counters
         self.previous_time = self.step_counter
         self.step_counter = 0
         self.episode += 1
-        self.prev_total_reward = self.total_reward
-        self.total_reward = 0
+        
         return observation, info
     
     def step(self, action):
@@ -171,11 +174,9 @@ class VehicleScheduling(gym.Env):
                     i.reward += 100 + i.lateness
                 else:
                     i.reward += -1
+                reward += i.reward
 
         done = not (False in dones)
-
-        # update total reward
-        self.total_reward += reward
 
         # return gym things
         observation = self._get_obs()
@@ -266,7 +267,7 @@ class VehicleScheduling(gym.Env):
         text = font.render("Step: " + str(self.step_counter), False, (0, 0, 0))
         text2 = font.render("Previous Steps: " + str(self.previous_time), False, (0, 0, 0))
         text3 = font.render("Episode: " + str(self.episode), False, (0, 0, 0))
-        text4 = font.render("Reward: " + str(self.total_reward), False, (0, 0, 0))
+        text4 = font.render("Reward: " + str(self.total_reward[-1]), False, (0, 0, 0))
         
         if self.agents == None:
             action = [None for i in range(self.n_agents)]
@@ -276,7 +277,7 @@ class VehicleScheduling(gym.Env):
         text5 = font.render("Action: " + str(action), False, (0, 0, 0))
         dones = [i.done for i in self.agents]
         text6 = font.render("Done: " + str(dones), False, (0, 0, 0))
-        text7 = font.render("Previous Reward: " + str(self.prev_total_reward), False, (0, 0, 0))
+        text7 = font.render("Previous Reward: " + str(self.total_reward[-2]), False, (0, 0, 0))
         lateness = [self.agents[j].lateness for j in range(self.n_agents)]
         text8 = font.render("Lateness: " + str(lateness), False, (0, 0, 0))
         lateness_prev = [self.agents[j].prev_lateness for j in range(self.n_agents)]

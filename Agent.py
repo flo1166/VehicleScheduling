@@ -35,7 +35,7 @@ class Agent():
   def epsilon_greedy_policy(self, env, epsilon):
     random_int = random.uniform(0,1)
     if random_int > epsilon:
-      action = np.argmax(self.qtable[self.current_state])
+      action = np.argmax(self.qtable[self.current_state[0]])
     else:
       action = env.action_space.sample()
     self.action = action

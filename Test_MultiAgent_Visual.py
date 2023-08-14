@@ -2,6 +2,7 @@ import gymnasium as gym
 from Test_MultiAgent import VehicleScheduling
 import numpy as np
 import random
+import pandas as pd
 
 gym.register(
     id='VehicleScheduling-v1',
@@ -11,8 +12,8 @@ gym.register(
 env = gym.make("VehicleScheduling-v1", render_mode="human")
 
 # Training parameters
-n_training_episodes = 1000
-learning_rate = 0.5        
+n_training_episodes = [100, 1000, 10000]
+learning_rate = [0.1, 0.5, 0.7]        
 
 # Evaluation parameters
 n_eval_episodes = 1000      
@@ -20,16 +21,17 @@ n_eval_episodes = 1000
 # Environment parameters
 env_id = "VehicleScheduling-v1"   
 max_steps = 99             
-gamma = 0.90              
+gamma = [0.90, 0.95, 0.99]              
 eval_seed = []             
 
 # Exploration parameters
-max_epsilon = 1.0           
+max_epsilon = [0.5, 0.7, 1.0]           
 min_epsilon = 0.05           
-decay_rate = 0.0005 
+decay_rate = [0.0005, 0.005, 0.05] 
 
 dict_state = {}
 iterator = 0
+
 for k in range(env.n):
   for h in range(env.m):
     dict_state[iterator] = np.array([h,k])
@@ -69,12 +71,25 @@ def train(n_training_episodes, min_epsilon, max_epsilon, decay_rate, env, max_st
       if done:
         break
 
-  return env.agents
+  return env.total_reward
 
-Qtable_VehicleScheduling = train(n_training_episodes, min_epsilon, max_epsilon, decay_rate, env, max_steps, learning_rate, gamma)
+# Hyperparameter Tuning
+Results = pd.DataFrame(columns = ['training_episodes', 'max_epsilon', 'decay_rate', 'learning_rate', 'gamma', 'mean_reward'])
+for a in n_training_episodes:
+  for b in max_epsilon:
+    for c in decay_rate:
+      for d in learning_rate:
+        for e in gamma:
+          current_rewards = train(a, min_epsilon, b, c, env, max_steps, d, e)
+          dict_frame = {'training_episodes': [a], 'max_epsilon': [b], 'decay_rate': [c], 'learning_rate': [d], 'gamma': [e], 'mean_reward': [np.mean(current_rewards[3:])]}
+          Results = pd.concat([Results, pd.DataFrame.from_dict(dict_frame)], ignore_index = True)
+          print(Results)
+#Qtable_VehicleScheduling = train(n_training_episodes[0], min_epsilon, max_epsilon[-1], decay_rate[0], env, max_steps, learning_rate[-2], gamma[-1])
+print(Results)
 
 for i in Qtable_VehicleScheduling:
-  print(i.qtable)
+  print(i.name, ':\n')
+  print(i.qtable, '\n')
 
 env.render()
 env.close()
