@@ -13,7 +13,7 @@ env = gym.make("VehicleScheduling-v1", render_mode="human")
 
 # Training parameters
 n_training_episodes = [100, 1000, 10000]
-learning_rate = [0.1, 0.5, 0.7]        
+learning_rate = [0.7, 0.5, 0.1]        
 
 # Evaluation parameters
 n_eval_episodes = 1000      
@@ -21,11 +21,11 @@ n_eval_episodes = 1000
 # Environment parameters
 env_id = "VehicleScheduling-v1"   
 max_steps = 99             
-gamma = [0.90, 0.95, 0.99]              
+gamma = [0.99, 0.95, 0.90]              
 eval_seed = []             
 
 # Exploration parameters
-max_epsilon = [0.5, 0.7, 1.0]           
+max_epsilon = [1, 0.7, 0.5]           
 min_epsilon = 0.05           
 decay_rate = [0.0005, 0.005, 0.05] 
 
@@ -52,8 +52,10 @@ def train(n_training_episodes, min_epsilon, max_epsilon, decay_rate, env, max_st
           if not env.agents[j].done:
             env.agents[j].epsilon_greedy_policy(env, epsilon)
             env.agents[j].action_to_direction(env.agents[j].action)
+            print(env.step_counter, env.agents[j].name,env.agents[j].direction)
           else:
             env.agents[j].direction = np.array([0,0])
+            print(env.step_counter, env.agents[j].name,env.agents[j].direction)
             env.agents[j].new_state = env.agents[j].current_state
       else:
         raise Exception("n_agents of environment doesn't match total agents") 
@@ -62,13 +64,18 @@ def train(n_training_episodes, min_epsilon, max_epsilon, decay_rate, env, max_st
 
       state, reward, done, truncated, info = env.step(action)
 
+      env.reward = reward
+
       # Update q vaues and state
       for n in env.agents:
         n.update_q_table(learning_rate, gamma, dict_state)
         n.current_state = n.new_state
 
+      if env.render_mode == "human":
+        env.render_frame()
       # If done, finish the episode
       if done:
+        print('reward:', env.reward)
         break
 
   return env.total_reward

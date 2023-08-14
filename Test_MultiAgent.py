@@ -15,7 +15,7 @@ class VehicleScheduling(gym.Env):
         self.m = m
         self._grid_shape = (m,n)
         self.grid = -1 * np.ones(self._grid_shape)
-        self.stations = [0, -1]
+        self.stations = [0, 9]
         self._create_grid()
         
         # visualization set up
@@ -46,11 +46,13 @@ class VehicleScheduling(gym.Env):
         """
         self.window = None
         self.clock = None
+        self.max_steps = max_steps
 
         # Counter
         self.step_counter = 0
         self.previous_time = 0
         self.episode = 0
+        self.reward = 0
         self.total_reward = [0,0]
  
     def _create_grid(self):
@@ -71,59 +73,9 @@ class VehicleScheduling(gym.Env):
         return True in checks
 
     def valid_action(self):
-#        shared_grid = self.grid
+
         for i in self.agents:
-#            current_state = i.current_state
-            i.new_state = np.clip(i.new_state, [0, 0], [self.m - 1, self.n])
-#            new_state = i.new_state
-#            shared_grid[current_state[0], current_state[1]] = i.name_int
-#            shared_grid[new_state[0], new_state[1]] = i.name_int
-
-        for k in self.agents:
-            for l in self.agents:
-                # check if they want to occupy same state
-                if k != l and np.array_equal(k.new_state, l.new_state):
-                    if k.prio > l.prio:
-                        if k.action == 1:
-                            l.new_state = l.current_state
-                        else:
-                            l.new_state = k.new_state + k.direction
-                    else:
-                        if l.action == 1:
-                            k.new_state = k.current_state
-                        else:
-                            k.new_state = l.new_state + l.direction
-                # check if they want to switch (as überholen is not allowed)
-                elif k != l and np.array_equal(k.new_state, l.current_state) and np.array_equal(k.current_state, l.new_state):
-                    # if k is in station
-                    if self.check_if_station(k.new_state):
-                        # check if k has higher prio, if so k can drive out of station
-                        if k.prio > l.prio:
-                            l.new_state = k.new_state + l.direction
-                        else:
-                            k.new_state = k.current_state
-                    # if l is in station
-                    elif self.check_if_station(l.new_state):
-                        # check if l has higher prio, if so k can drive out of station
-                        if l.prio > k.prio:
-                            k.new_state = l.new_state + k.direction
-                        else:
-                            l.new_state = l.current_state
-                    else:
-                        # both are not in a station, check if k has higher prio
-                        if k.prio > l.prio:
-                            if k.action != 1:
-                                l.new_state = k.new_state + k.direction
-                            else:
-                                l.new_state = l.current_state
-                        else:
-                            if l.action != 1:
-                                k.new_state = l.new_state + l.direction
-                            else:
-                                k.new_state = k.current_state
-
-        for n in self.agents:
-            n.new_state = np.clip(n.new_state, [0, 0], [self.m - 1, self.n])
+            i.new_state = np.clip(i.new_state, [0, 0], [self.m - 1, self.n - 1])
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
@@ -133,7 +85,7 @@ class VehicleScheduling(gym.Env):
         reward = [j.reward for j in self.agents]
         reward = np.sum(reward)
         self.total_reward.append(reward)
-
+        self.reward = 0
         # Choose the agent's location uniformly at random
         for i in self.agents:
             i.current_state = i.start_location
@@ -146,52 +98,63 @@ class VehicleScheduling(gym.Env):
         info = self._get_info()
 
         if self.render_mode == "human":
-            self._render_frame()
+            self.render_frame()
 
         # reset counters
         self.previous_time = self.step_counter
         self.step_counter = 0
         self.episode += 1
-        
+
         return observation, info
     
     def step(self, action):
         self.step_counter += 1
+        truncated = False
 
-        # check if the action is valid to not leave the grid (np.clip) nor to illegaly move
+        # check if agent is in grid world
         self.valid_action()
 
-        # An episode is done if the agent has reached the target
+        # An episode is done if all agents have reached the target
         dones = []
         reward = 0
 
+        # Check if same position
+        crash = False
         for i in self.agents:
             if i.done == False:
                 i.done = np.array_equal(i.current_state, i.end_location)
                 dones.append(i.done)
                 if i.done:
                     i.lateness = i.timetable_start + i.duration - self.step_counter
-                    i.reward += 100 + i.lateness
+                    i.reward = 100 + i.lateness
                 else:
-                    i.reward += -1
+                    i.reward = 0
+                
+                for j in self.agents:
+                    if i != j and (np.array_equal(i.new_state, j.new_state) or (np.array_equal(i.new_state, j.current_state) and i.action != j.action)):
+                        if not self.check_if_station(i.new_state) or not self.check_if_station(i.current_state):
+                            i.lateness = self.max_steps
+                            i.reward = -200
+                            i.done = True
+                            done = True
+                            crash = True
+                
                 reward += i.reward
-
-        done = not (False in dones)
+        
+        if not crash:
+            done = not (False in dones)
 
         # return gym things
         observation = self._get_obs()
         info = self._get_info()
 
-        if self.render_mode == "human":
-            self._render_frame()
-
-        return observation, reward, done, False, info
+        return observation, reward, done, truncated, info
     
     def render(self):
         if self.render_mode == "rgb_array":
             return self._render_frame()
 
-    def _render_frame(self):
+    def render_frame(self):
         if self.window is None and self.render_mode == "human":
             pygame.init()
             pygame.display.init()
@@ -267,7 +230,7 @@ class VehicleScheduling(gym.Env):
         text = font.render("Step: " + str(self.step_counter), False, (0, 0, 0))
         text2 = font.render("Previous Steps: " + str(self.previous_time), False, (0, 0, 0))
         text3 = font.render("Episode: " + str(self.episode), False, (0, 0, 0))
-        text4 = font.render("Reward: " + str(self.total_reward[-1]), False, (0, 0, 0))
+        text4 = font.render("Reward: " + str(self.reward), False, (0, 0, 0))
         
         if self.agents == None:
             action = [None for i in range(self.n_agents)]
@@ -277,7 +240,7 @@ class VehicleScheduling(gym.Env):
         text5 = font.render("Action: " + str(action), False, (0, 0, 0))
         dones = [i.done for i in self.agents]
         text6 = font.render("Done: " + str(dones), False, (0, 0, 0))
-        text7 = font.render("Previous Reward: " + str(self.total_reward[-2]), False, (0, 0, 0))
+        text7 = font.render("Previous Reward: " + str(self.total_reward[-1]), False, (0, 0, 0))
         lateness = [self.agents[j].lateness for j in range(self.n_agents)]
         text8 = font.render("Lateness: " + str(lateness), False, (0, 0, 0))
         lateness_prev = [self.agents[j].prev_lateness for j in range(self.n_agents)]
