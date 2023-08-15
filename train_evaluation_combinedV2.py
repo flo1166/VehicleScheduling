@@ -2,6 +2,8 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pygame
+import random
 
 class Train:
     def __init__(self, start, goal, departure_time, arrival_time):
@@ -20,6 +22,8 @@ class TrainEnvironment:
         self.stations = {'A': 0, 'B': 4, 'C': 8}  # Define the train stations
         self.total_states = n_states #* len(trains)
         self.reset()
+        # visualization set up
+        self.window_size = 512  # The size of the PyGame window
 
     def reset(self):
         for train in self.trains:
@@ -60,6 +64,71 @@ class TrainEnvironment:
             reward -= (train.actual_arrival_time - train.arrival_time)
         return [t.position for t in self.trains], reward, done
 
+    def render_frame(self, step, episode, total_reward, render = 10):
+        # initialisation of pygame
+        pygame.init()
+        pygame.display.init()
+        self.window = pygame.display.set_mode((self.window_size, self.window_size))
+        self.clock = pygame.time.Clock()
+        canvas = pygame.Surface((self.window_size, self.window_size))
+        canvas.fill((255, 255, 255))
+        random.seed(42)
+        pix_square_size = self.window_size / self.n_states
+
+        # visual basics
+        colors = [random.sample(range(0, 255), 3) for i in range(len(self.trains))]
+        font = pygame.font.Font('freesansbold.ttf', 20)
+
+        # First we draw the targets
+        for j in range(len(self.trains)):
+            pygame.draw.rect(
+                canvas,
+                colors[j],
+                pygame.Rect(
+                    (pix_square_size * self.trains[j].goal, 0),
+                    (pix_square_size, pix_square_size),
+                ),
+            )
+        
+        # Now we draw the agent
+        circle_int = 150
+        for k in range(len(self.trains)):
+            pygame.draw.circle(
+                canvas,
+                colors[k],
+                ((self.trains[k].position + 0.5) * pix_square_size, 0.5 * pix_square_size),
+                pix_square_size / 3,
+            )
+
+        # Finally, add some gridlines
+        for x in range(self.n_states + 1):
+            pygame.draw.line(
+                canvas,
+                0,
+                (pix_square_size * x, 0),
+                (pix_square_size * x, pix_square_size * 1),
+                width=3,
+            )
+
+        for x in range(2):
+            pygame.draw.line(
+                canvas,
+                0,
+                (0, pix_square_size * x),
+                (self.window_size, pix_square_size * x),
+                width=3,
+            )
+
+        canvas.blit(font.render('Step: ' + str(step), False, (0,0,0)), (25,325))
+        canvas.blit(font.render('Episode: ' + str(episode), False, (0,0,0)), (25,300))
+        canvas.blit(font.render('Total Reward: ' + str(total_reward), False, (0,0,0)), (25,350))
+
+        # The following line copies our drawings from `canvas` to the visible window
+        self.window.blit(canvas, canvas.get_rect())
+        pygame.event.pump()
+        pygame.display.update()
+        self.clock.tick(render)
+
 
 class QLearningAgent:
     def __init__(self, n_states, n_actions, learning_rate=0.8, discount_factor=0.8, exploration_rate=0.8, exploration_decay=0.9):
@@ -82,7 +151,7 @@ class QLearningAgent:
         target = reward + self.gamma * np.max(self.q_table[next_state, :])
         self.q_table[state, action] = self.q_table[state, action] + self.lr * (target - predict)
 
-def train_agents(env, agents, n_episodes=10000000, max_steps=50):
+def train_agents(env, agents, n_episodes=10000, max_steps=50):
     rewards_per_episode = []
     for episode in range(n_episodes):
         state = env.reset()
@@ -91,7 +160,7 @@ def train_agents(env, agents, n_episodes=10000000, max_steps=50):
         step = 0
         crashed = False  # Flag to check if the episode should end due to a collision
         
-        while not all(done) and step < max_steps:
+        while not all(done) and step < (max_steps + 1):
             for i, agent in enumerate(agents):
                 if not done[i] and step >= env.trains[i].departure_time:
                     action = agent.choose_action(state[i])
@@ -101,8 +170,12 @@ def train_agents(env, agents, n_episodes=10000000, max_steps=50):
                     total_reward += reward
                     if next_state[i] == env.trains[i].goal:
                         done[i] = True
+
                 if crashed:  # Check if the episode should end due to a collision
                     break
+
+            env.render_frame(step, episode, total_reward, agents)
+
             state = next_state  # Update the state
             #print(f"Train State: {state}")
             step += 1
