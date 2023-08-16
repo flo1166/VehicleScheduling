@@ -64,7 +64,7 @@ class TrainEnvironment:
             reward -= (train.actual_arrival_time - train.arrival_time)
         return [t.position for t in self.trains], reward, done
 
-    def render_frame(self, step, episode, total_reward, render = 10):
+    def render_frame(self, step, episode, total_reward, actions, render = 10):
         # initialisation of pygame
         pygame.init()
         pygame.display.init()
@@ -122,13 +122,13 @@ class TrainEnvironment:
         canvas.blit(font.render('Step: ' + str(step), False, (0,0,0)), (25,325))
         canvas.blit(font.render('Episode: ' + str(episode), False, (0,0,0)), (25,300))
         canvas.blit(font.render('Total Reward: ' + str(total_reward), False, (0,0,0)), (25,350))
+        canvas.blit(font.render('Actions: ' + str(actions), False, (0,0,0)), (25,350))
 
         # The following line copies our drawings from `canvas` to the visible window
         self.window.blit(canvas, canvas.get_rect())
         pygame.event.pump()
         pygame.display.update()
         self.clock.tick(render)
-
 
 class QLearningAgent:
     def __init__(self, n_states, n_actions, learning_rate=0.8, discount_factor=0.8, exploration_rate=0.8, exploration_decay=0.9):
@@ -159,11 +159,14 @@ def train_agents(env, agents, n_episodes=10000, max_steps=50):
         done = [False] * len(agents)
         step = 0
         crashed = False  # Flag to check if the episode should end due to a collision
+        actions = []
         
         while not all(done) and step < (max_steps + 1):
+            curr_action = []
             for i, agent in enumerate(agents):
                 if not done[i] and step >= env.trains[i].departure_time:
-                    action = agent.choose_action(state[i])
+                    action = np.argmax(agent.q_table[state, :])
+                    curr_action.append((agent, action))
                     next_state, reward, crashed = env.step(i, action, step)
                     #print(f"Train {i} Action: {action}")
                     agent.learn(state[i], action, reward, next_state[i])
@@ -173,8 +176,9 @@ def train_agents(env, agents, n_episodes=10000, max_steps=50):
 
                 if crashed:  # Check if the episode should end due to a collision
                     break
-
-            env.render_frame(step, episode, total_reward, agents)
+            
+            actions = curr_action
+            env.render_frame(step, episode, total_reward, agents, actions)
 
             state = next_state  # Update the state
             #print(f"Train State: {state}")
@@ -185,6 +189,37 @@ def train_agents(env, agents, n_episodes=10000, max_steps=50):
         env.reset()  # Reset the environment at the end of each episode
     return rewards_per_episode
 
+def evaluate_agents(n_eval_episodes, max_steps = 50):
+  for episode in range(n_eval_episodes):
+    step = 0
+    total_reward = 0
+    done = [False] * len(agents)
+    while not all(done) and step < (max_steps + 1):
+        curr_action = []
+        for i, agent in enumerate(agents):
+            if not done[i] and step >= env.trains[i].departure_time:
+                action = agent.choose_action(state[i])
+                curr_action.append((agent, action))
+                next_state, reward, crashed = env.step(i, action, step)
+                total_reward += reward
+                if next_state[i] == env.trains[i].goal:
+                    done[i] = True
+
+            if crashed:  # Check if the episode should end due to a collision
+                break
+        
+        actions = curr_action
+        env.render_frame(step, episode, total_reward, agents, actions)
+
+        state = next_state  # Update the state
+        #print(f"Train State: {state}")
+        step += 1
+        if crashed:  # Break out of the outer loop if the episode should end
+            break
+    rewards_per_episode.append(total_reward)
+    env.reset()  # Reset the environment at the end of each episode
+
+  return env
 
 def print_q_table(q_table, agent_id):
     print(f"\nAgent {agent_id} Q-Table:")
@@ -215,12 +250,6 @@ agents = [QLearningAgent(env.total_states, 3) for _ in env.trains]
 
 # Train the agents
 rewards = train_agents(env, agents)
-
-
-
-
-
-
 
 # Output Q-Table
 for i, agent in enumerate(agents):
