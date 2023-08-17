@@ -2,9 +2,11 @@ import numpy as np
 import random
 
 class Agent():
-  def __init__(self, name, name_int, start, end, state_space, action_space, priority, timetable_start, duration):
+  random.seed(42) # gucken wohin?
+  def __init__(self, name, name_int, zug_id, start, end, state_space, action_space, timetable_start, duration, timetable_end, active):
     self.name = name
     self.name_int = name_int
+    self.zug_id = zug_id
     self.start_location = start
     self.end_location = end
     self.current_state = start
@@ -14,11 +16,12 @@ class Agent():
     self.done = False
     self.direction = None
     self.action = None
-    self.prio = priority
     self.timetable_start = timetable_start
+    self.timetable_end = timetable_end
     self.duration = duration
     self.lateness = 0
-    self.prev_lateness = 0
+    self.crash = False
+    self.active = active
   
   def initialize_q_table(self, state_space, action_space):
     Qtable = np.zeros((state_space, action_space))
@@ -35,9 +38,15 @@ class Agent():
   def epsilon_greedy_policy(self, env, epsilon):
     random_int = random.uniform(0,1)
     if random_int > epsilon:
-      action = np.argmax(self.qtable[self.current_state[0]])
+      qtable = self.qtable[self.current_state[0]]
+      if sum(qtable == np.argmax(qtable)) > 1:
+        cur_index = np.where(qtable == np.max(qtable))[0]
+        action = random.choice(cur_index)
+      else:
+        action = np.argmax(self.qtable[self.current_state[0]])
     else:
       action = env.action_space.sample()
+    #print(env.step_counter, self.name, action)
     self.action = action
 
   def greedy_policy(self):
@@ -52,4 +61,5 @@ class Agent():
       }
     self.direction = action_to_direction[action]
     self.new_state = self.current_state + self.direction
+    #print(self.name, self.direction)
     
