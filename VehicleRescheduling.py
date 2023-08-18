@@ -202,7 +202,7 @@ class QLearningAgent:
         target = reward + self.gamma * np.max(self.q_table[next_state, :])
         self.q_table[state, action] = self.q_table[state, action] + self.lr * (target - predict)
 
-def train_agents(env, agents, n_episodes=15000, max_steps=300, viz_on = 0):
+def train_agents(env, agents, n_episodes=10000, max_steps=200, viz_on = 0):
     rewards_per_episode = []
     deltas_arrival = []
     for episode in range(n_episodes):
@@ -254,7 +254,7 @@ def train_agents(env, agents, n_episodes=15000, max_steps=300, viz_on = 0):
     pygame.quit()
     return rewards_per_episode, deltas_arrival
 
-def evaluate_agent(env, agent, n_eval_episodes=1000, max_steps=300, q_table = None, viz_on = 0):
+def evaluate_agent(env, agent, n_eval_episodes=1000, max_steps=200, q_table = None, viz_on = 0):
     rewards_per_episode = []
     deltas_arrival = []
     for episode in range(n_eval_episodes):
@@ -316,10 +316,10 @@ def print_q_table(q_table, agent_id):
 
 def grid_search(env, agents):
     Results = pd.DataFrame(columns = ['training_episodes', 'max_epsilon', 'decay_rate', 'learning_rate', 'gamma', 'mean_reward', 'mean_lateness'])
-    n_training_episodes = [15000]
+    n_training_episodes = [10000]
     epsilon = [0.8, 0.9, 1]
     decay_rate = [0.95, 0.995, 0.9995]
-    max_steps = 300
+    max_steps = 200
     learning_rate = [0.9, 0.6, 0.3]
     gamma = [0.8, 0.9, 0.95]
 
@@ -354,16 +354,16 @@ agents = [QLearningAgent(env.total_states, 3, learning_rate=0.4, discount_factor
 # Train the agents
 rewards, delay_per_episode = train_agents(env, agents)
 
-# Performance Evaluation - based on learned q-values
+# Performance Evaluation - based on learned q-vmax_alues
 mean_reward, std_reward, delay_per_episode_eval = evaluate_agent(env, agents, q_table = rewards)
 
 # Initalizing delayed environment
 trains_delayed = [
-    Train(0, 4, 0, departure_time=3, arrival_time=7),
-    Train(4, 0, 1, departure_time=8, arrival_time=12),
-    Train(0, 8, 2, departure_time=5, arrival_time=8),
-    Train(8, 4, 3, departure_time=0, arrival_time=4),
-    Train(4, 8, 4, departure_time=7, arrival_time=11)
+    Train(0, 4, 0, None, departure_time=3, arrival_time=7),
+    Train(4, 0, 1, 0, departure_time=8, arrival_time=12),
+    Train(0, 8, 2, None, departure_time=5, arrival_time=8),
+    Train(8, 4, 3, None, departure_time=0, arrival_time=4),
+    Train(4, 8, 4, 3, departure_time=7, arrival_time=11)
 ]
 env_delayed = TrainEnvironment(9, trains_delayed)
 agents_delayed = [QLearningAgent(env_delayed.total_states, 3, learning_rate=0.3, discount_factor=0.80, exploration_rate=0.2, exploration_decay=0.95) for _ in env_delayed.trains]
